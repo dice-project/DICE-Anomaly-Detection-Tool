@@ -152,7 +152,7 @@ class QueryConstructor():
         cquery.aggs["3"].aggs["43"].avg.field = "ContainersKilled"
         cquery.aggs["3"].aggs["44"].avg.field = "ContainersIniting"
         cquery.aggs["3"].aggs["45"].avg.field = "ContainersRunning"
-        cquery.aggs["3"].aggs["47"].avg.field = "AvailableGB"
+        cquery.aggs["3"].aggs["47"].avg.field = "AllocatedGB"
         cquery.aggs["3"].aggs["48"].avg.field = "AllocatedContainers"
         cquery.aggs["3"].aggs["49"].avg.field = "AvailableGB"
         cquery.aggs["3"].aggs["50"].avg.field = "AllocatedVCores"
@@ -324,7 +324,7 @@ class QueryConstructor():
         cquery.aggs["34"].aggs["12"].avg.field = "CapacityTotalGB"
         cquery.aggs["34"].aggs["13"].avg.field = "CapacityUsed"
         #cquery.aggs["34"].aggs["14"].avg.field = "CapacityTotalGB" ####
-        cquery.aggs["34"].aggs["15"].avg.field = "CapacityUsed"
+        #cquery.aggs["34"].aggs["15"].avg.field = "CapacityUsed"
         cquery.aggs["34"].aggs["16"].avg.field = "CapacityUsedGB"
         cquery.aggs["34"].aggs["17"].avg.field = "CapacityRemaining"
         cquery.aggs["34"].aggs["18"].avg.field = "CapacityRemainingGB"

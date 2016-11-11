@@ -22,10 +22,19 @@ from dmonconnector import Connector
 from adpconfig import readConf
 from adplogger import logger
 from datetime import datetime
+from adpengine import dmonadpengine
+from util import getModelList, parseDelay
 import time
+from dmonweka import *
+from dataformatter import DataFormatter
+import tempfile
+
 
 
 def main(argv):
+    dataDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+    modelsDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models')
+
     settings = {
         "esendpoint": None,
         "esInstanceEndpoint": 9200,
@@ -34,25 +43,32 @@ def main(argv):
         "from": None, # timestamp
         "to": None, # timestamp
         "query": None,
+        "nodes": None,
         "qsize": None,
         "qinterval": None,
         "train": None, # Bool default None
-        "model":None,
-        "load":None,
+        "type": None,
+        "load": None,
         "file": None,
         "method": None,
         "validate": None, # Bool default None
         "export": None,
         "detect": None, # Bool default None
+        "cfilter": None,
+        "rfilter": None,
+        "dfilter": None,
         "sload": None,
         "smemory": None,
-        "snetwork": None
+        "snetwork": None,
+        "heap": None,
+        "checkpoint": None,
+        "delay": None,
+        "interval": None
     }
 
     # Only for testing
-    settings['train'] = True
+
     settings['validate'] = False
-    settings['detect'] = False
 
     try:
         opts, args = getopt.getopt(argv, "he:tf:m:vx:d:lq:", ["endpoint=", "file=", "method=", "export=", "detect=", "query="])  # todo:expand comand line options
@@ -79,7 +95,9 @@ def main(argv):
         elif opt in ("-d", "--detect"):
             settings["detect"] = arg
         elif opt in ("-l", "--list-models"):
-            print "Return current saved models based on Method"  # TODO
+            print "Current saved models are:\n"
+            print getModelList()
+            sys.exit(0)
         elif opt in ("-q", "--query"):
             settings["query"] = arg
 
@@ -88,7 +106,6 @@ def main(argv):
     print "Initializing ..."
     print "Trying to read configuration file ..."
 
-    file_conf = ''
     if settings["file"] is None:
         file_conf = 'dmonadp.ini'
         logger.info('[%s] : [INFO] Settings file set to %s',
@@ -171,6 +188,24 @@ def main(argv):
         print "Query -> %s" % settings['query']
         logger.info('[%s] : [INFO] Query set to %s',
                            datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['query'])
+
+    if settings["nodes"] is None:
+        try:
+            if not readCnf['Connector']['nodes']:
+                readCnf['Connector']['nodes'] = 0
+            print "Desired Nodes -> %s" % readCnf['Connector']['nodes']
+            settings["nodes"] = readCnf['Connector']['nodes']
+            logger.info('[%s] : [INFO] Desired nodes set to %s',
+                    datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'),
+                    settings['nodes'])
+        except:
+            logger.warning('[%s] : [WARN] No nodes selected from config file or comandline querying all',
+                           datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
+            settings["nodes"] = 0
+    else:
+        print "Desired Nodes -> %s" % settings["nodes"]
+        logger.info('[%s] : [INFO] Desired nodes set to %s',
+                    datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings["nodes"])
 
     if settings["qsize"] is None:
         try:
@@ -265,20 +300,20 @@ def main(argv):
         logger.info('[%s] : [INFO] Method is set to %s from comandline',
                             datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings["method"])
 
-    if settings["model"] is None:
+    if settings["type"] is None:
         try:
-            print "Detect Model -> %s" %readCnf['Detect']['model']
-            settings["model"] = readCnf['Detect']['model']
-            logger.info('[%s] : [INFO] Model is set to %s from conf',
-                            datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings["model"])
+            print "Detect Type -> %s" %readCnf['Detect']['type']
+            settings["type"] = readCnf['Detect']['type']
+            logger.info('[%s] : [INFO] Type is set to %s from conf',
+                            datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings["type"])
         except:
-            logger.error('[%s] : [ERROR] Model is not set in conf or comandline!',
+            logger.error('[%s] : [ERROR] Type is not set in conf or comandline!',
                                  datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
             sys.exit(1)
     else:
-        print "Detect Model -> %s" %settings['model']
-        logger.info('[%s] : [INFO] Model is set to %s from comandline',
-                            datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings["model"])
+        print "Detect Type -> %s" %settings['type']
+        logger.info('[%s] : [INFO] Type is set to %s from comandline',
+                            datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings["type"])
 
     if settings["export"] is None:
         try:
@@ -355,6 +390,98 @@ def main(argv):
         logger.warning('[%s] : [WARN] System netowrk is not set, using default!',
                     datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 
+    try:
+        print "Heap size set to -> %s" %readCnf['Misc']['heap']
+        settings['heap'] = readCnf['Misc']['heap']
+        logger.info('[%s] : [INFO] Heap size set to %s',
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['heap'])
+    except:
+        print "Heap size not defined using default"
+        settings['heap'] = '512m'
+        logger.info('[%s] : [INFO] Heap size set to default %s',
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['heap'])
+
+    try:
+        if readCnf['Filter']['columns']:
+            print "Filter columns -> %s" %readCnf['Filter']['columns']
+            settings["cfilter"] = readCnf['Filter']['columns']
+        else:
+            print "Filter columns -> %s" % settings["cfilter"]
+    except:
+        print "Filter columns -> %s" % settings["cfilter"]
+    finally:
+        logger.info('[%s] : [INFO] Filter column set to %s',
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['cfilter'])
+
+    try:
+        print "Filter rows -> %s" %readCnf['Filter']['rows']
+        settings["rfilter"] = readCnf['Filter']['rows']
+    except:
+        print "Filter rows -> %s" %settings["rfilter"]
+    finally:
+        logger.info('[%s] : [INFO] Filter rows set to %s',
+                    datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['rfilter'])
+
+    try:
+        if readCnf['Filter']['dcolumns']:
+            print "Filter drop columns -> %s" % readCnf['Filter']['dcolumns']
+            settings["dfilter"] = readCnf['Filter']['dcolumns']
+        else:
+            print "Filter drop columns -> %s" % settings["dfilter"]
+    except:
+        print "Filter drop columns -> %s" % settings["dfilter"]
+    finally:
+        logger.info('[%s] : [INFO] Filter drop column set to %s',
+                    datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['dfilter'])
+
+    if settings["checkpoint"] is None:
+        try:
+            print "Checkpointing is set to %s" %readCnf['Misc']['checkpoint']
+            settings["checkpoint"] = readCnf['Misc']['checkpoint']
+            logger.info('[%s] : [INFO] Checkpointing is  set to %s',
+                        datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['checkpoint'])
+        except:
+            print "Checkpointing not set using default"
+            settings["checkpoint"] = "True"
+            logger.info('[%s] : [INFO] Checkpointing is  set to True',
+                    datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
+    else:
+        print "Checkpointing is set to %s" %settings["checkpoint"]
+        logger.info('[%s] : [INFO] Checkpointing is  set to %s',
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['checkpoint'])
+
+    if settings["delay"] is None:
+        try:
+            print "Delay is set to %s" %readCnf['Misc']['delay']
+            settings["delay"] = readCnf['Misc']['delay']
+            logger.info('[%s] : [INFO] Delay is  set to %s',
+                    datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['delay'])
+        except:
+            print "Delay is not set, setting default"
+            settings["delay"] = "2m"
+            logger.info('[%s] : [INFO] Delay is  set to %s',
+                        datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['delay'])
+    else:
+        print "Delay is set to %s" % settings["delay"]
+        logger.info('[%s] : [INFO] Delay is  set to %s',
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['delay'])
+
+    if settings["interval"] is None:
+        try:
+            print "Interval is set to %s" % readCnf['Misc']['interval']
+            settings["interval"] = readCnf['Misc']['interval']
+            logger.info('[%s] : [INFO] Interval is  set to %s',
+                        datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['interval'])
+        except:
+            print "Interval is not set, setting default"
+            settings["interval"] = "15m"
+            logger.info('[%s] : [INFO] Interval is  set to %s',
+                        datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['interval'])
+    else:
+        print "Interval is set to %s" % settings["interval"]
+        logger.info('[%s] : [INFO] Interval is  set to %s',
+                        datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['interval'])
+
 
 
     #if settings["esendpoint"] == None:
@@ -364,6 +491,46 @@ def main(argv):
     #print dmonC
     print "Conf file -> %s" %readCnf
     print "Settings  -> %s" %settings
+
+    engine = dmonadpengine.AdpEngine(settings, dataDir=dataDir, modelsDir=modelsDir)
+    #engine.printTest()
+    engine.initConnector()
+    #
+    #
+    engine.run(engine)
+    # systemReturn, yarnReturn, reducemetrics, mapmetrics, sparkReturn, stormReturn = engine.getData()
+    # dformat = DataFormatter(dataDir)
+    # test = dweka(dataDir, modelsDir)
+    # options = ["-N", "10", "-S", "10"]
+    #
+    # # dataf = dformat.savetomemory(yarnReturn)
+    # # dataf = dformat.df2cStringIO(yarnReturn)
+    # dataf = tempfile.NamedTemporaryFile(suffix='.csv')
+    # print dataf.name
+    # # print dataf.file
+    # # print dataf.star
+    #
+    # dformat.df2csv(yarnReturn, dataf.name)
+    # test.simpleKMeansTrain(dataf.name, options)
+    # anomalies = test.runclustermodel("skm", dataf.name)
+    # for e in anomalies:
+    #     # print ut2hum(e)
+    #     print e / 1000
+    # dataf.close()
+
+
+    # print type(dataf.getvalue())
+    # dataf = "cTest.csv"
+
+    #
+    # filtered_df = engine.filterData(yarnReturn)
+    # filtered_df.to_csv(os.path.join(dataDir, 'ctest2.csv'), index=False)
+    # test = systemReturn.set_index('key')
+    # print test.to_dict()
+    # engine.trainMethod()
+    # engine.detectAnomalies(30)
+    # engine.printTest()
+
     print "#" * 100
 
 
