@@ -102,7 +102,7 @@ class QueryConstructor():
 
     def jvmMapProcessingString(self, host):
         qstring = "type:\"maptask-metrics\" AND serviceType:\"jvm\" AND hostname:\"%s\"" % host
-        return qstring
+        return qstring #TODO
 
     def jvmRedProcessbyNameString(self, host, process):
         qstring = "type:\"reducetask-metrics\" AND serviceType:\"jvm\" AND hostname:\"%s\" AND ProcessName:\"%s\"" %(host, process)
