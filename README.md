@@ -1,4 +1,16 @@
-# DICE-Anomaly-Detection-Tool
-For a detailed description please visit the official [wiki](https://github.com/dice-project/DICE-Anomaly-Detection-Tool/wiki).
+# dmon-adp
+DICE Anomaly Detection Platform
 
-This is the official release repository, for the dev branch plese visit this [repository](https://github.com/igabriel85/dmon-adp).
+Settings
+
+he:tf:m:vx:d:
+
+h -> Help text
+e -> ES endpoint
+t -> train
+f -> load config file
+m -> method
+v -> validate
+x -> export model
+d -> detect anomalies
+l -> load model (model name)
