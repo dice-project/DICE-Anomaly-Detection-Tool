@@ -34,6 +34,7 @@ import tempfile
 def main(argv):
     dataDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
     modelsDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models')
+    queryDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'queries')
 
     settings = {
         "esendpoint": None,
@@ -64,7 +65,13 @@ def main(argv):
         "checkpoint": None,
         "delay": None,
         "interval": None,
-        "resetindex": None
+        "resetindex": None,
+        "training":None,
+        "validation":None,
+        "validratio":0.0,
+        "compare": False,
+        "anomalyOnly": False,
+        "categorical": None
     }
 
     # Only for testing
@@ -116,6 +123,7 @@ def main(argv):
     print "Starting DICE Anomaly detection framework"
     print "Initializing ..."
     print "Trying to read configuration file ..."
+    print queryDir
 
     if settings["file"] is None:
         file_conf = 'dmonadp.ini'
@@ -502,7 +510,7 @@ def main(argv):
             settings["resetindex"] = False
     else:
         print "Reset index set to %s" % settings["resetindex"]
-    logger.info('[%s] : [INFO] Reset index set to %s"',
+    logger.info('[%s] : [INFO] Reset index set to %s',
                 datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['resetindex'])
 
     try:
@@ -590,12 +598,13 @@ def main(argv):
     # settings = {'load': 'test1', 'qsize': '0', 'dfilter': None, 'export': 'test1', 'file': None, 'rfilter': None, 'query': 'cassandra', 'index': 'lscassandra', 'detect': 'false', 'from': '1481569200000', 'checkpoint': 'false', 'to': '1481580000000', 'sload': 'shortterm:gd:2.0;midterm:ld:0.1;longterm:gd:1.0', 'nodes': 0, 'type': 'clustering', 'method': 'isoforest', 'snetwork': 'tx:gd:34344;rx:ld:323434', 'resetindex': 'false', 'interval': '15m', 'train': 'true', 'esInstanceEndpoint': 9200, 'heap': '512m', 'validate': False, 'qinterval': '20s', 'dmonPort': '5001', 'esendpoint': '85.120.206.27', 'smemory': 'cached:gd:231313;buffered:ld:312123;used:ld:12313;free:gd:23123', 'delay': '2m', 'MethodSettings': {'max_samples': '100', 'n_jobs': '1', 'verbose': '0', 'bootstrap': 'False', 'n_estimators': '100', 'random_state': 'None', 'contamination': '0.01', 'max_features': '1.0'}, 'cfilter': None}
     # End testing settings
 
-    engine = dmonadpengine.AdpEngine(settings, dataDir=dataDir, modelsDir=modelsDir)
+    engine = dmonadpengine.AdpEngine(settings, dataDir=dataDir, modelsDir=modelsDir, queryDir=queryDir)
     #engine.printTest()
     engine.initConnector()
     #
     #
-    engine.run(engine)
+    # engine.run(engine)
+    engine.runProcess(engine)
     # systemReturn, yarnReturn, reducemetrics, mapmetrics, sparkReturn, stormReturn, cassandraReturn = engine.getData()
     # dformat = DataFormatter(dataDir)
     # test = dweka(dataDir, modelsDir)
