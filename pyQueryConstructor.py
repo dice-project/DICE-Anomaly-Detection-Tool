@@ -1,9 +1,12 @@
 from addict import Dict
+import os
+import json
 
 
 class QueryConstructor():
-    def __init__(self):
+    def __init__(self, queryDir):
         self.author = 'Constructor for dmon-adp ES connector querys'
+        self.queryDir = queryDir
         # self.systemLoadString = "collectd_type:\"load\" AND host:\"dice.cdh.master\""
 
     def loadString(self, host):
@@ -138,6 +141,15 @@ class QueryConstructor():
     def mongodbGaugeString(self, host):
         qstring = "plugin:mongo AND collectd_type:gauge AND host:\"%s\"" % host
         file = "MongoDB_Gauge_%s.csv" % host
+        return qstring, file
+
+    def sideQueryString(self):
+        file = "query_response.csv"
+        return file
+
+    def cepQueryString(self):
+        qstring = "type:cep-posidonia AND DComp:DMON"
+        file = "CEP.csv"
         return qstring, file
 
     def loadAverage(self):  # TODO
@@ -874,7 +886,49 @@ class QueryConstructor():
         cqueryd = cquery.to_dict()
         return cqueryd
 
+    def cepQuery(self, qstring, qgte, qlte, qsize, qinterval, wildCard=True, qtformat="epoch_millis",
+        qmin_doc_count=1):
+        cquery = Dict()
+        cquery.highlight.pre_tags = ["@kibana-highlighted-field@"]
+        cquery.highlight.post_tags = ["@/kibana-highlighted-field@"]
+        cquery.highlight.fields = {"*":{}}
+        cquery.highlight.require_field_match = False
+        cquery.highlight.fragment_size = 2147483647
+
+        cquery.query.filtered.query.query_string.query = qstring
+        cquery.query.filtered.query.query_string.analyze_wildcard = wildCard
+        cquery.query.filtered.filter.bool.must = [
+            {"range": {"@timestamp": {"gte": qgte, "lte": qlte, "format": qtformat}}}]
+        cquery.query.filtered.filter.bool.must_not = []
+
+        cquery.sort = [{"@timestamp": {"order": "desc", "unmapped_type": "boolean"}}]
+        cquery.size = qsize
+
+        cquery.aggs["2"].date_histogram.field = "@timestamp"
+        cquery.aggs["2"].date_histogram.interval = qinterval
+        cquery.aggs["2"].date_histogram.time_zone = "Europe/Helsinki"
+        cquery.aggs["2"].date_histogram.min_doc_count = qmin_doc_count
+        cquery.aggs["2"].date_histogram.extended_bounds.min = qgte
+        cquery.aggs["2"].date_histogram.extended_bounds.max = qlte
+
+        cquery.fields = ["*", "_source"]
+        cquery.script_fields = {}
+        cquery.fielddata_fields = ["@timestamp"]
+        cqueryd = cquery.to_dict()
+        return cqueryd
+
+
     def sparkQuery(self):
         return "Spark metrics query"
+
+    def sideQuery(self):
+        queryFile = os.path.join(self.queryDir, 'query.json')
+        with open(queryFile) as query:
+            squeryd = json.load(query)
+        return squeryd
+
+
+
+
 
 
