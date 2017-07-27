@@ -513,6 +513,70 @@ def main(argv):
     logger.info('[%s] : [INFO] DMon Port is set to %s"',
                 datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), str(settings['dmonPort']))
 
+    try:
+        print "Classification Training set is %s" % readCnf['Detect']['training']
+        settings['training'] = readCnf['Detect']['training']
+    except:
+        print "Classification training set is default"
+    logger.info('[%s] : [INFO] Classification Training set is %s',
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), str(settings['training']))
+
+    try:
+        print "Classification Validation set is %s" % readCnf['Detect']['validation']
+        settings['validation'] = readCnf['Detect']['validation']
+    except:
+        print "Classification Validation set is default"
+    logger.info('[%s] : [INFO] Classification Validation set is %s',
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), str(settings['validation']))
+
+    try:
+        print "Classification validation ratio is set to %d" % int(readCnf['Detect']['validratio'])
+        if float(readCnf['Detect']['validratio']) > 1.0:
+            print "Validation ratio is out of range, must be between 1.0 and 0.1"
+            settings['validratio'] = 0.0
+        settings['validratio'] = float(readCnf['Detect']['validratio'])
+    except:
+        print "Classification Validation ratio is default"
+    logger.info('[%s] : [INFO] Classification Validation ratio is %s',
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), str(settings['validratio']))
+
+    try:
+        print "Classification comparison is set to %s" % readCnf['Detect']['compare']
+        settings['compare'] = readCnf['Detect']['compare']
+    except:
+        print "Classification comarison is default"
+    logger.info('[%s] : [INFO] Classification comparison is %s',
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings['compare'])
+
+    try:
+        print "Classification data generation using only anomalies set to %s" % readCnf['Detect']['anomalyOnly']
+        settings['anomalyOnly'] = readCnf['Detect']['anomalyOnly']
+    except:
+        print "Classification data generation using only anomalies set to False"
+    logger.info('[%s] : [INFO] Classification data generation using only anomalies set to %s',
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), str(settings['anomalyOnly']))
+
+    if settings["categorical"] is None:
+        try:
+            if not readCnf['Connector']['categorical']:
+                readCnf['Connector']['categorical'] = 0
+            print "Categorical Features -> %s" % readCnf['Connector']['categorical']
+            if readCnf['Connector']['categorical'] == '0':
+                settings["categorical"] = None
+            else:
+                settings["categorical"] = readCnf['Connector']['categorical']
+            logger.info('[%s] : [INFO] Categorical Features ->  %s',
+                    datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'),
+                    settings['categorical'])
+        except:
+            logger.warning('[%s] : [WARN] No Categorical Features selected from config file or comandline! Skipping encoding',
+                           datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
+            settings["categorical"] = 0
+    else:
+        print "Categorical Features -> %s" % settings["categorical"]
+        logger.info('[%s] : [INFO] Categorical Features ->  %s',
+                    datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), settings["categorical"])
+
     #if settings["esendpoint"] == None:
 
     #dmonC = Connector('85.120.206.27')
